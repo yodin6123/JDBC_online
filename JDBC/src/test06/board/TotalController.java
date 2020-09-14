@@ -277,7 +277,6 @@ public class TotalController {
 		
 		return result;
 	}// end of write(MemberDTO loginMember, Scanner sc)
-	// 깃 수
 
 
 

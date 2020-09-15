@@ -152,11 +152,11 @@ public class TotalController {
 			
 			switch (menuNo) {
 				case "1":  // 글목록보기
-					
+					boardList();
 					break;
 
 				case "2":  // 글내용보기
-					
+					viewContents(loginMember, sc);  // 조회하는 사람이 누구인지 알아야 조회수가 올라갈지 말지 알 수 있기 때문에 로그인 정보 전달해야 한다.
 					break;
 
 				case "3":  // 글쓰기
@@ -168,11 +168,16 @@ public class TotalController {
 						System.out.println(">> 글쓰기를 취소하셨습니다!! <<\n");
 					else
 						System.out.println(">> 장애가 발생하여 글쓰기가 실패되었습니다!! <<\n");
-					
 					break;
 					
-				case "4":  // 댓글쓰기
+				case "4":  // 댓글쓰기(jdbc_comment 테이블에 insert 하기)
+					n = writeComment(loginMember, sc);
 					
+					if(n==1) {
+						System.out.println(">> 댓글쓰기 성공!! <<");
+					} else {
+						System.out.println(">> 댓글쓰기 실패!! <<");
+					}
 					break;
 					
 				case "5":  // 글수정하기
@@ -216,6 +221,58 @@ public class TotalController {
 	}// end of public void menu_Board(MemberDTO member, Scanner sc)----------
 	
 	
+	// 글목록 보기 //
+	private void boardList() {
+		List<BoardDTO> boardList = bdao.boardList();  // 결과물로 출력되는 하나의 행이 DTO이다 ==> 여러 행(DTO)을 담을 List가 반환되어야할 것이다.
+		
+		StringBuilder sb = new StringBuilder();
+		
+		if(boardList.size() > 0) {  // 게시글이 존재하는 경우 
+			// select 결과가 없을 경우 nullPointException을 피하기 위해 조건문 추가
+			// boardList는 null 값을 가지지 않는다. 메소드 생성 시 객체 생성을 기본적으로 해주었기 때문이다.
+			// 따라서 list 내부에 데이터가 있는지 없는지를 조건으로 따져야한다.
+			for(int i=0; i<boardList.size(); i++) {
+				sb.append(boardList.get(i).listInfo()+"\n");
+			}// end of for-----------------------------------
+			
+			System.out.println("\n-------------------- [ 게시글 목록 ] --------------------");
+			System.out.println("글번호\t글제목\t\t작성자\t작성일자\t조회수");
+			System.out.println("----------------------------------------------------------------");
+			System.out.println(sb.toString());
+		} else {  // 게시글이 존재하지 않는 경우
+			System.out.println(">>> 글목록이 없습니다 <<<\n");
+		}
+		
+	}// end of boardList()
+	
+	
+	// 글내용보기 //
+	private void viewContents(MemberDTO loginMember, Scanner sc) {
+		System.out.println("\n>>> 글 내용 보기 <<<");
+		
+		System.out.print("▷ 글번호 : ");
+		String boardNo = sc.nextLine();
+		
+		BoardDTO bdto = bdao.viewContents(boardNo);
+		// 특정 글번호(고유)에 대한 내용을 보여주고(select --> where boardno = boardNo)
+		// 해당 글이 다른 사람이 쓴 글이라면 조회수를 1 증가하도록 한다(update viewcount + 1 --> where boardno = boardNo)
+		
+		if(bdto != null) {
+			// 존재하는 글번호를 입력한 경우
+			System.out.println("[글내용] "+bdto.getContents());
+			
+			if(!bdto.getFk_userid().equals(loginMember.getUserid())) {
+				// 현재 로그인한 사용자가 자신의 글이 아닌 다른 사용자가 쓴 글을 조회했을 경우에만 조회수 1 증가시키기
+				bdao.updateViewCount(boardNo);
+			}
+		} else {
+			// 존재하지 않는 글번호를 입력한 경우
+			System.out.println(">> 글번호 "+boardNo+"은 글목록에 존재하지 않습니다 <<\n");
+		}
+		
+	}// end of viewContents(MemberDTO loginMember, Scanner sc)-----
+
+
 	// 글쓰기(글쓰기[jdbc_board 테이블에 insert] + 글쓴 회원의 포인트를 10증가[jdbc_member 테이블에 update] ==> Transaction 처리)
 	private int write(MemberDTO loginMember, Scanner sc) {
 		int result = 0;
@@ -277,7 +334,40 @@ public class TotalController {
 		
 		return result;
 	}// end of write(MemberDTO loginMember, Scanner sc)
-
+	
+	
+	// 댓글쓰기(jdbc_comment 테이블에 insert) //
+	private int writeComment(MemberDTO loginMember, Scanner sc) {
+		int result = 0;
+		
+		System.out.println("\n>>> 댓글쓰기 <<<");
+		
+		System.out.println("1. 작성자명 : " + loginMember.getName());
+		
+		System.out.print("2. 원글의 글번호 : ");
+		String boardno = sc.nextLine();  // 존재하지 않는 원글의 글번호를 입력할 수 있다.
+		
+		String contents = null;
+		do {
+			System.out.print("3. 댓글내용 : ");
+			contents = sc.nextLine();
+			
+			if(contents==null || contents.trim().isEmpty()) {
+				System.out.println(">> 댓글내용은 필수로 입력해야 합니다 <<\n");
+			} else {
+				break;
+			}
+		} while(true);
+		
+		BoardCommentDTO cmdto = new BoardCommentDTO();
+		cmdto.setFk_boardno(boardno); 				  // 원글의 글번호
+		cmdto.setFk_userid(loginMember.getUserid());  // 댓글을 작성한 사용자의 id ==> 현재 로그인한 사용자의 id
+		cmdto.setContents(contents);  				  // 댓글내용
+		
+		result = bdao.writeComment(cmdto);  // 댓글쓰기(jdbc_comment 테이블에 insert)
+		
+		return result;
+	}
 
 
 	// **** Connection 자원반납  **** //

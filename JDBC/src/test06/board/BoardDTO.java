@@ -10,6 +10,8 @@ public class BoardDTO {
 	private int viewcount;      // 조회수 
 	private String boardpasswd; // 글암호
 	
+	private MemberDTO member;   // select용 (jdbc_member 테이블과 jdbc_board 테이블의 JOIN). 글쓴이에 대한 모든 정보
+	
 	public int getBoardno() {
 		return boardno;
 	}
@@ -51,6 +53,24 @@ public class BoardDTO {
 	}
 	public void setBoardpasswd(String boardpasswd) {
 		this.boardpasswd = boardpasswd;
+	}
+	public MemberDTO getMember() {
+		return member;
+	}
+	public void setMember(MemberDTO member) {
+		this.member = member;
+	}
+	
+	// select 결과 전체를 한번에 불러올 메소드
+	public String listInfo() {  // 글번호\t글제목\t글쓴이\t작성일자\t조회수
+		if(subject != null && subject.length() > 10) {
+			subject = subject.substring(0, 10) + "..";
+			// 글제목이 10글자보다 크면 10글자만 보여주고 뒤에 ".." 을 찍어준다.
+		}
+		
+		String listInfo = boardno+"\t"+subject+"\t"+member.getName()+"\t"+writeday+"\t"+viewcount;
+		
+		return listInfo;
 	}
 
 }

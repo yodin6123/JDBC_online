@@ -181,7 +181,21 @@ public class TotalController {
 					break;
 					
 				case "5":  // 글수정하기
-					
+					n = updateBoard(loginMember, sc);
+					// n 값은 개발자 임의로 설정하여 출력 결과를 케이스별로 나눈다.
+					if(n==0) {
+						System.out.println(">> 수정할 글번호가 글목록에 존재하지 않습니다. <<\n");
+					} else if(n==1) {
+						System.out.println(">> 다른 사용자의 글은 수정불가 합니다!! <<\n");
+					} else if(n==2) {
+						System.out.println(">> 글암호가 올바르지 않습니다. <<\n");
+					} else if(n==3) {
+						System.out.println(">> 글 수정 실패!! <<\n");
+					} else if(n==4) {
+						System.out.println(">> 글 수정 취소!! <<\n");
+					} else if(n==5) {
+						System.out.println(">> 글 수정 성공!! <<\n");
+					}
 					break;
 					
 				case "6":  // 글삭제하기
@@ -265,6 +279,27 @@ public class TotalController {
 				// 현재 로그인한 사용자가 자신의 글이 아닌 다른 사용자가 쓴 글을 조회했을 경우에만 조회수 1 증가시키기
 				bdao.updateViewCount(boardNo);
 			}
+			
+			System.out.println("[댓글]\n----------------------------------------");
+			
+			List<BoardCommentDTO> commentList = bdao.commentList(boardNo);  // 원글에 대한 댓글을 가져오는 것(특정 게시글 글번호에 대한jdbc_comment 테이블과 jdbc_member 테이블을 JOIN해서 보여준다.)
+			
+			if(commentList != null) {
+				System.out.println("댓글내용\t작성자\t작성일자");
+				System.out.println("----------------------------------------");
+				
+				StringBuilder sb = new StringBuilder();
+				
+				for(BoardCommentDTO comment : commentList) {  // 개선된 for문, 확장 for문, for each문
+					sb.append(comment.commentInfo()+"\n");
+				}// end of for-------------------------------
+				
+				System.out.println(sb.toString());
+			} else {
+				System.out.println(">> 댓글 내용 없음 <<\n");
+			}
+			
+			
 		} else {
 			// 존재하지 않는 글번호를 입력한 경우
 			System.out.println(">> 글번호 "+boardNo+"은 글목록에 존재하지 않습니다 <<\n");
@@ -365,6 +400,74 @@ public class TotalController {
 		cmdto.setContents(contents);  				  // 댓글내용
 		
 		result = bdao.writeComment(cmdto);  // 댓글쓰기(jdbc_comment 테이블에 insert)
+		
+		return result;
+	}
+	
+	
+	// 글 수정하기 //
+	private int updateBoard(MemberDTO loginMember, Scanner sc) {
+		int result = 0;
+		
+		System.out.println("\n>>> 글 수정 하기 <<<");
+		
+		System.out.print("▷ 수정할 글번호 : ");
+		String boardNo = sc.nextLine();
+		
+		Map<String, String> paraMap = new HashMap<String, String>();  // 여러 개의 파라미터(인자)를 넘겨줄 때 Map을 사용한다.
+		paraMap.put("boardNo", boardNo);
+		
+		BoardDTO bdto = bdao.viewContents(paraMap);  // 수정할 글번호가 있는지 확인하기 위해 글내용보기 메소드 재활용
+		// 현재 paraMap에는 boardPasswd라는 것이 없는 상태이다.
+		
+		if(bdto != null) {
+			// 수정할 글번호가 글목록에 존재하는 경우라면
+			
+			if(bdto.getFk_userid().equals(loginMember.getUserid())) {
+				// 로그인한 사용자가 쓴 글을 수정할 경우
+				System.out.print("▷ 글암호 : ");
+				String boardPasswd = sc.nextLine();
+				
+				paraMap.put("boardPasswd", boardPasswd);
+				
+				bdto = bdao.viewContents(paraMap);  // 글번호 뿐만 아니라 글암호까지 파라미터로 넘겨주기 위해 메소드 변경
+				// 현재 paraMap에는 boardPasswd라는 것이 있는 상태이다.
+				
+				if(bdto != null) {
+					// 글암호가 올바른 경우
+					// 수정할 글을 보여주고, 글수정 작업에 들어가도록 한다.
+					System.out.println("------------------------------");
+					System.out.println("글제목 : " + bdto.getSubject());
+					System.out.println("글내용 : " + bdto.getContents());
+					System.out.println("------------------------------\n");
+					
+					System.out.print("▷ 글제목[변경하지 않으려면 엔터]: ");
+					String subject = sc.nextLine();
+					if(subject!=null && subject.trim().isEmpty()) {
+						subject = bdto.getSubject();
+					}
+					
+					System.out.print("▷ 글내용[변경하지 않으려면 엔터]: ");
+					String contents = sc.nextLine();
+					if(contents!=null && contents.trim().isEmpty()) {
+						contents = bdto.getContents();
+					}
+					
+					paraMap.put("subject", subject);
+					paraMap.put("contents", contents);  // 글번호는 이미 paraMap에 들어가 있다.
+					
+					int n = bdao.updateBoard(paraMap);
+					
+				} else {
+					// 글암호가 틀린 경우
+					result = 2;
+				}
+				
+			} else {
+				// 로그인한 사용자가 쓴 글이 아닌 다른 사용자가 쓴 글을 수정할 경우
+				result = 1;
+			}
+		}
 		
 		return result;
 	}

@@ -8,6 +8,8 @@ public class BoardCommentDTO {
 	private String contents;    // 댓글내용 
 	private String writeday;    // 작성일자
 	
+	private MemberDTO member;   // select용 (jdbc_member 테이블과 JOIN 하기 위해 필요하다)
+	
 	public int getCommentno() {
 		return commentno;
 	}
@@ -37,6 +39,18 @@ public class BoardCommentDTO {
 	}
 	public void setWriteday(String writeday) {
 		this.writeday = writeday;
+	}
+	public MemberDTO getMember() {
+		return member;
+	}
+	public void setMember(MemberDTO member) {
+		this.member = member;
+	}
+	
+	// 댓글 내용
+	public String commentInfo() {
+		String info = contents+"\t"+member.getName()+"\t"+writeday;
+		return info;
 	}
 
 }

@@ -12,6 +12,8 @@ public class BoardDTO {
 	
 	private MemberDTO member;   // select용 (jdbc_member 테이블과 jdbc_board 테이블의 JOIN). 글쓴이에 대한 모든 정보
 	
+	private int commentcnt;     // select용 원글에 달린 댓글의 개수
+	
 	public int getBoardno() {
 		return boardno;
 	}
@@ -60,6 +62,12 @@ public class BoardDTO {
 	public void setMember(MemberDTO member) {
 		this.member = member;
 	}
+	public int getCommentcnt() {
+		return commentcnt;
+	}
+	public void setCommentcnt(int commentcnt) {
+		this.commentcnt = commentcnt;
+	}
 	
 	// select 결과 전체를 한번에 불러올 메소드
 	public String listInfo() {  // 글번호\t글제목\t글쓴이\t작성일자\t조회수
@@ -67,6 +75,13 @@ public class BoardDTO {
 			subject = subject.substring(0, 10) + "..";
 			// 글제목이 10글자보다 크면 10글자만 보여주고 뒤에 ".." 을 찍어준다.
 		}
+		
+		subject = (commentcnt>0) ? subject+"["+commentcnt+"]" : subject;
+		/*
+		 * if(commentcnt > 0) {
+		 * 		subject += "["+commentcnt+"]"
+		 * }
+		 */
 		
 		String listInfo = boardno+"\t"+subject+"\t"+member.getName()+"\t"+writeday+"\t"+viewcount;
 		

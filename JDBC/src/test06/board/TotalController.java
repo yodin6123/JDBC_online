@@ -2,8 +2,10 @@ package test06.board;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
+import my.util.MyUtil;
 import test05.singleton.dbconnection.MyDBConnection;
 
 public class TotalController {
@@ -200,13 +202,33 @@ public class TotalController {
 					
 				case "6":  // 글삭제하기
 					
+					n = deleteBoard(loginMember, sc);
+					
+					if(n==0) {
+						System.out.println(">> 삭제할 글번호가 글목록에 존재하지 않습니다. <<\n");
+					} else if(n==1) {
+						System.out.println(">> 다른 사용자의 글은 삭제불가 합니다!! <<\n");
+					} else if(n==2) {
+						System.out.println(">> 글암호가 올바르지 않습니다. <<\n");
+					} else if(n==3) {
+						System.out.println(">> 글 삭제 실패!! <<\n");
+					} else if(n==4) {
+						System.out.println(">> 글 삭제 취소!! <<\n");
+					} else if(n==5) {
+						System.out.println(">> 글 삭제 성공!! <<\n");
+					}
+					
 					break;
 					
 				case "7":  // 최근1주일간 일자별 게시글 작성건수
 					
+					statisticsByWeek();
+					
 					break;
 					
 				case "8":  // 이번달 일자별 게시글 작성건수
+					
+					statisticsByCurrentMonth();
 					
 					break;
 					
@@ -267,9 +289,12 @@ public class TotalController {
 		System.out.print("▷ 글번호 : ");
 		String boardNo = sc.nextLine();
 		
-		BoardDTO bdto = bdao.viewContents(boardNo);
-		// 특정 글번호(고유)에 대한 내용을 보여주고(select --> where boardno = boardNo)
-		// 해당 글이 다른 사람이 쓴 글이라면 조회수를 1 증가하도록 한다(update viewcount + 1 --> where boardno = boardNo)
+		Map<String, String> paraMap = new HashMap<String, String>();
+		paraMap.put("boardNo", boardNo);
+		
+		BoardDTO bdto = bdao.viewContents(paraMap);
+		// 특정 글번호(고유)에 대한 내용을 보여주고(select --> where boardno = paraMap.get("boardNo"))
+		// 해당 글이 다른 사람이 쓴 글이라면 조회수를 1 증가하도록 한다(update viewcount + 1 --> where boardno = paraMap.get("boardNo"))
 		
 		if(bdto != null) {
 			// 존재하는 글번호를 입력한 경우
@@ -458,6 +483,37 @@ public class TotalController {
 					
 					int n = bdao.updateBoard(paraMap);
 					
+					if(n==1) {
+						
+						Connection conn = MyDBConnection.getConn();
+						
+						do {
+							System.out.print("▷ 정말로 수정하시겠습니까?[Y/N] ");
+							String yn = sc.nextLine();
+							
+							try {
+								if("y".equalsIgnoreCase(yn)) {
+									conn.commit();
+									result = 5;
+									break;
+								} else if("n".equalsIgnoreCase(yn)) {
+									conn.rollback();
+									result = 4;
+									break;
+								} else {
+									System.out.println(">> Y 또는 N 만 입력하세요!! <<");
+								}
+							} catch(SQLException e) {
+								e.printStackTrace();
+								break;
+							}
+						} while (true);
+						
+					} else {
+						// sql문에 장애가 발생한 경우
+						result = 3;
+					}
+					
 				} else {
 					// 글암호가 틀린 경우
 					result = 2;
@@ -470,6 +526,148 @@ public class TotalController {
 		}
 		
 		return result;
+	}
+	
+	
+	// 글 삭제하기 //
+	private int deleteBoard(MemberDTO loginMember, Scanner sc) {
+
+		int result = 0;
+		
+		System.out.println("\n>>> 글 삭제 하기 <<<");
+		
+		System.out.print("▷ 삭제할 글번호 : ");
+		String boardNo = sc.nextLine();
+		
+		Map<String, String> paraMap = new HashMap<String, String>();
+		paraMap.put("boardNo", boardNo);
+		
+		BoardDTO bdto = bdao.viewContents(paraMap);
+		
+		if(bdto != null) {
+			
+			if(loginMember.getUserid().equals(bdto.getFk_userid())) {
+				
+				System.out.print("▷ 글암호 : ");
+				String boardPasswd = sc.nextLine();
+				
+				paraMap.put("boardPasswd", boardPasswd);
+				
+				bdto = bdao.viewContents(paraMap);
+				
+				if(bdto != null) {
+					
+					System.out.println("------------------------------");
+					System.out.println("글제목 : " + bdto.getSubject());
+					System.out.println("글내용 : " + bdto.getContents());
+					System.out.println("------------------------------\n");
+					
+					int n = bdao.deleteBoard(boardNo);
+					
+					if(n==1) {
+						
+						Connection conn = MyDBConnection.getConn();
+						
+						do {
+							
+							System.out.print("▷ 정말로 삭제하시겠습니까?[Y/N] ");
+							String yn = sc.nextLine();
+							
+							try {
+								if("y".equalsIgnoreCase(yn)) {
+									conn.commit();
+									result = 5;
+									break;
+								} else if("n".equalsIgnoreCase(yn)) {
+									conn.rollback();
+									result = 4;
+									break;
+								} else {
+									System.out.println(">> Y 또는 N 만 입력하세요!! <<");
+								}
+							} catch(SQLException e) {
+								e.printStackTrace();
+								break;
+							}
+							
+						} while (true);
+						
+					} else {
+						result = 3;
+					}
+					
+				} else {
+					result = 2;
+				}
+				
+			} else {
+				result = 1;
+			}
+		}
+		
+		return result;
+	}
+	
+	
+	// 최근1주일간 일자별 게시글 작성건수 //
+	private void statisticsByWeek() {
+		
+		System.out.println("------------ [최근 1주일간 일자별 게시글 작성건수] ------------");
+		
+		String result = "전체\t";
+		for(int i=0; i<7; i++) {
+			result += MyUtil.getDay(-(6-i)) + " ";
+		}// end of for----------
+		
+		System.out.println(result);
+		System.out.println("------------------------------------------------------");
+		
+		Map<String, Integer> resultMap = bdao.statisticsByWeek();  // select 결과물 --> DTO가 아닌 Map으로 받을 수도 있다. 하나의 행 결과물을 Map으로 받는다(Map = DTO라고 생각).
+		
+		String str = resultMap.get("TOTAL")+"\t"+
+				resultMap.get("PREVIOUS6")+"\t"+
+				resultMap.get("PREVIOUS5")+"\t"+
+				resultMap.get("PREVIOUS4")+"\t"+
+				resultMap.get("PREVIOUS3")+"\t"+
+				resultMap.get("PREVIOUS2")+"\t"+
+				resultMap.get("PREVIOUS1")+"\t"+
+				resultMap.get("TODAY");
+		
+		System.out.println(str);
+			
+	}
+	
+	
+	// 이번달 일자별 게시글 작성건수
+	private void statisticsByCurrentMonth() {
+
+		Calendar currentDate = Calendar.getInstance();  // 현재 날짜와 시간을 얻어온다.
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy년 MM월");
+		String currentMonth = dateFormat.format(currentDate.getTime());
+		
+		System.out.println(">>> ["+currentMonth+" 일자별 게시글 작성건수] <<<");
+		System.out.println("-----------------------------------");
+		System.out.println("작성일자\t작성건수");
+		System.out.println("-----------------------------------");
+		
+		List<Map<String, String>> mapList = bdao.statisticsByCurrentMonth();
+		
+		if(mapList.size() > 0) {
+			
+			StringBuilder sb = new StringBuilder();
+			
+			for(Map<String, String> map : mapList) {
+				sb.append(map.get("WRITEDAY") + "\t" + map.get("CNT") + "\n");
+			}// end of for----------
+			
+			System.out.println(sb.toString());
+			
+		} else {
+			
+			System.out.println(">> 작성된 게시글이 없습니다. <<");
+			
+		}
+			
 	}
 
 

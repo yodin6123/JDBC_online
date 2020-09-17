@@ -279,6 +279,8 @@ public class BoardDAO implements InterBoardDAO {
 		return commentList;
 	}
 
+	
+	// 글 수정하기 //
 	@Override
 	public int updateBoard(Map<String, String> paraMap) {
 		
@@ -287,7 +289,7 @@ public class BoardDAO implements InterBoardDAO {
 		try {
 			conn = MyDBConnection.getConn();
 			
-			String sql = "update jdbc_board set subject = ? , contents = ?\n"+
+			String sql = "update jdbc_board set subject = ?, contents = ?\n"+
 					"where boardno = ?";
 			
 			pstmt = conn.prepareStatement(sql);
@@ -295,13 +297,8 @@ public class BoardDAO implements InterBoardDAO {
 			pstmt.setString(2, paraMap.get("contents"));
 			pstmt.setString(3, paraMap.get("boardNo"));
 			
-			int n = pstmt.executeUpdate();
+			result = pstmt.executeUpdate();
 			
-			if(n == 1) {
-				conn.commit();
-			} else {
-				conn.rollback();
-			}
 		} catch (SQLException e) {
 			e.printStackTrace();
 		} finally {
@@ -309,6 +306,119 @@ public class BoardDAO implements InterBoardDAO {
 		}
 		
 		return result;
+		
+	}
+
+	
+	// 글 삭제하기 //
+	@Override
+	public int deleteBoard(String boardNo) {
+		
+		int result = 0;
+		
+		try {
+			conn = MyDBConnection.getConn();
+			
+			String sql = "delete from jdbc_board\n"+
+					"where boardno = ?";
+			
+			pstmt = conn.prepareStatement(sql);
+			pstmt.setString(1, boardNo);
+			
+			result = pstmt.executeUpdate();
+			
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			close();
+		}
+		
+		return result;
+	}
+
+	
+	// 최근 1주일간 일자별 게시글 작성건수 조회하기 ==> select 결과를 Map으로 받는 메소드 //
+	@Override
+	public Map<String, Integer> statisticsByWeek() {
+
+		Map<String, Integer> resultMap = new HashMap<String, Integer>();  // 조회 수가 0이어도 0이 결과로 나오기 때문에 select 행이 무조건 나온다. 
+		
+		try {
+			conn = MyDBConnection.getConn();
+			
+			String sql = "select count(*) AS TOTAL\n"+
+					"     , sum(decode(func_midnight(sysdate) - func_midnight(writeday), 6, 1, 0)) AS PREVIOUS6\n"+
+					"     , sum(decode(func_midnight(sysdate) - func_midnight(writeday), 5, 1, 0)) AS PREVIOUS5\n"+
+					"     , sum(decode(func_midnight(sysdate) - func_midnight(writeday), 4, 1, 0)) AS PREVIOUS4\n"+
+					"     , sum(decode(func_midnight(sysdate) - func_midnight(writeday), 3, 1, 0)) AS PREVIOUS3\n"+
+					"     , sum(decode(func_midnight(sysdate) - func_midnight(writeday), 2, 1, 0)) AS PREVIOUS2\n"+
+					"     , sum(decode(func_midnight(sysdate) - func_midnight(writeday), 1, 1, 0)) AS PREVIOUS1\n"+
+					"     , sum(decode(func_midnight(sysdate) - func_midnight(writeday), 0, 1, 0)) AS TODAY\n"+
+					"from jdbc_board\n"+
+					"where func_midnight(sysdate) - func_midnight(writeday) < 7";
+			
+			pstmt = conn.prepareStatement(sql);
+			
+			rs = pstmt.executeQuery();
+			
+			rs.next();  // 행이 무조건 나오기 때문에 조건문을 쓸 필요가 없이 커서 위치만 옮겨준다.
+			
+			resultMap.put("TOTAL", rs.getInt(1));
+			resultMap.put("PREVIOUS6", rs.getInt(2));
+			resultMap.put("PREVIOUS5", rs.getInt(3));
+			resultMap.put("PREVIOUS4", rs.getInt(4));
+			resultMap.put("PREVIOUS3", rs.getInt(5));
+			resultMap.put("PREVIOUS2", rs.getInt(6));
+			resultMap.put("PREVIOUS1", rs.getInt(7));
+			resultMap.put("TODAY", rs.getInt(8));
+			
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			close();
+		}
+		
+		return resultMap;
+	}
+
+	
+	// 이번달 일자별 게시글 작성건수 조회하기 //
+	@Override
+	public List<Map<String, String>> statisticsByCurrentMonth() {
+		
+		List<Map<String, String>> mapList = new ArrayList<Map<String,String>>();
+		
+		try {
+			conn = MyDBConnection.getConn();
+			
+			String sql = "select decode(grouping(to_char(writeday, 'yyyy-mm-dd')), 0, to_char(writeday, 'yyyy-mm-dd'), '전체') AS WRITEDAY\n"+
+					"     , count(*) AS CNT\n"+
+					"from jdbc_board\n"+
+					"where to_char(writeday, 'yyyy-mm') = to_char(sysdate, 'yyyy-mm')\n"+
+					"group by rollup(to_char(writeday, 'yyyy-mm-dd'))";
+			
+			pstmt = conn.prepareStatement(sql);
+			
+			rs = pstmt.executeQuery();
+			
+			while(rs.next()) {
+				
+				Map<String, String> map = new HashMap<String, String>();
+				
+				map.put("WRITEDAY", rs.getString(1));
+				map.put("CNT", rs.getString(2));  // String으로 받아도 호환 가능 또는 map.put("CNT", String.valueOf(rs.getString(2))); int로 받아 변환
+				
+				mapList.add(map);
+				
+			}// end of while----------
+			
+		} catch (SQLException e) {
+			e.printStackTrace();
+		} finally {
+			close();
+		}
+		
+		return mapList;
 		
 	}
 
